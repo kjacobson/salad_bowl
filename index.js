@@ -4,6 +4,7 @@ const ioClient = require('socket.io-client')
 
 const API_BASE = `http://localhost:3000`
 const TERMS_PER_PLAYER = 2
+const TIME_PER_ROUND = 15
 const ROUNDS = [
     'Describe the term in as many words as necessary',
     'Act out the term, but don\'t speak',
@@ -16,7 +17,7 @@ const PHASES = {
     COLLECTING_TERMS: 2,
     WAITING_TO_START: 3,
     PLAY_IN_PROGRESS: 4,
-    BETWEEN_ROUNDS: 5,
+    BETWEEN_PLAYERS: 5,
     DONE: 6
 }
 
@@ -53,7 +54,7 @@ const initialState = () => {
         turn: 0,
         currentTerm: null,
         score: [0, 0],
-        timeRemaining: 60,
+        timeRemaining: TIME_PER_ROUND,
         currentPhase: PHASES.NO_ACTIVE_GAMES
     }
 }
@@ -217,7 +218,14 @@ const endTurn = () => {
     const player = state.teams[state.turn].pop()
     state.teams[state.turn].push(player)
     state.turn = state.turn ? 0 : 1
-    state.currentPhase = PHASES.WAITING_TO_START
+    state.currentPhase = PHASES.BETWEEN_PLAYERS
+
+    return saveGame(state)
+}
+const resumeGameplay = () => {
+    const state = getState()
+    state.currentPhase = PHASES.PLAY_IN_PROGRESS
+    state.currentTerm = state.activeTerms.pop()
 
     return saveGame(state)
 }
@@ -227,7 +235,7 @@ const changeRound = (state) => {
     if (state.currentRound < 2) {
         state.currentRound++
         state.timeRemaining = 60
-        state.currentPhase = PHASES.BETWEEN_ROUNDS
+        state.currentPhase = PHASES.WAITING_TO_START
     } else {
         return endGame()
     }
@@ -362,9 +370,16 @@ const handleBeginGameplay = e => {
 }
 const waitingToStart = state => {
     return html`<p>
-        Everyone has entered terms.<br />
-        Team 1: ${state.teams[0].map(player => player.name).join(', ')}<br />
-        Team 2: ${state.teams[1].map(player => player.name).join(', ')}<br />
+        <h1>Round ${state.currentRound + 1}: ${ROUNDS[state.currentRound]}</h1>
+        ${state.currentRound === 0 ? 'Everyone has entered terms.<br />' : ''}
+        <strong>Team 1:</strong><br />
+        Players: ${state.teams[0].map(player => player.name).join(', ')}<br />
+        Score: ${state.score[0]}<br /><br />
+
+        <strong>Team 2:</strong><br />
+        Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
+        Score: ${state.score[1]}<br /><br />
+        
         <strong>${currentPlayer(state).name}</strong> is up first for <strong>Team ${state.turn + 1}</strong></br />
         ${isCurrentPlayer(state) ? html`<button onclick="${handleBeginGameplay}">Begin round ${state.currentRound + 1}</button>` : ''} 
     </p>` 
@@ -387,12 +402,28 @@ const playInProgress = state => {
         `
 }
 
-const betweenRounds = state => {
-    return html`
-        <h1>Next round: ${ROUNDS[state.currentRound]}</h1>
-    `
-}
+const handleResumeGameplay = e => {
+    e.preventDefault()
 
+    return resumeGameplay().then(data => {
+        return changeState(data)
+    })
+}
+const betweenPlayers = state => {
+    return html`<p>
+        <h1>Round ${state.currentRound + 1}: ${ROUNDS[state.currentRound]}</h1>
+        <strong>Team 1:</strong><br />
+        Players: ${state.teams[0].map(player => player.name).join(', ')}<br />
+        Score: ${state.score[0]}<br /><br />
+
+        <strong>Team 2:</strong><br />
+        Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
+        Score: ${state.score[1]}<br /><br />
+
+        <strong>${currentPlayer(state).name}</strong> is up next for <strong>Team ${state.turn + 1}</strong></br />
+        ${isCurrentPlayer(state) ? html`<button onclick="${handleResumeGameplay}">Go</button>` : ''} 
+    </p>` 
+}
 const render = state => {
     const el = html`<main id="main">${body(state)}</main>`
     document.body.replaceChild(el, document.getElementById('main'))
@@ -410,8 +441,8 @@ const body = state => {
             return waitingToStart(state)
         case PHASES.PLAY_IN_PROGRESS:
             return playInProgress(state)
-        case PHASES.BETWEEN_ROUNDS: 
-            return betweenRounds(state)
+        case PHASES.BETWEEN_PLAYERS:
+            return betweenPlayers(state)
         case PHASES.DONE:
             return ''
     }
