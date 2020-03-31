@@ -1,2 +1,2 @@
 FROM node:current
-WORKDIR '/'
+WORKDIR '/var/www/app'
