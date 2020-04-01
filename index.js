@@ -2,9 +2,9 @@ const html = require('nanohtml')
 const uuid = require('uuid').v4
 const ioClient = require('socket.io-client')
 
-const API_BASE = `http://localhost:3000`
-const TERMS_PER_PLAYER = 2
-const TIME_PER_ROUND = 15
+const API_BASE = ''
+const TERMS_PER_PLAYER = 3
+const TIME_PER_ROUND = 60
 const ROUNDS = [
     'Describe the term in as many words as necessary',
     'Act out the term, but don\'t speak',
