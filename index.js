@@ -215,8 +215,11 @@ const beginGameplay = () => {
 }
 const endTurn = () => {
     const state = getState()
-    const player = state.teams[state.turn].pop()
-    state.teams[state.turn].push(player)
+    clearTimeout(state.tick)
+    // put the current term back on the stack
+    state.activeTerms.push(state.currentTerm)
+    // move the player who just played to the end of the line
+    state.teams[state.turn].push(state.teams[state.turn].shift())
     state.turn = state.turn ? 0 : 1
     state.timeRemaining = TIME_PER_ROUND
     state.currentPhase = PHASES.BETWEEN_PLAYERS
@@ -227,14 +230,19 @@ const resumeGameplay = () => {
     const state = getState()
     state.currentPhase = PHASES.PLAY_IN_PROGRESS
     state.currentTerm = state.activeTerms.pop()
+    tick(state)
 
     return saveGame(state)
 }
 const changeRound = (state) => {
     state = state || getState()
+    clearTimeout(state.tick)
 
     if (state.currentRound < 2) {
+        // move the player who just played to the end of the line
+        state.teams[state.turn].push(state.teams[state.turn].shift())
         state.currentRound++
+        state.turn = state.turn ? 0 : 1
         state.timeRemaining = TIME_PER_ROUND
         state.currentPhase = PHASES.WAITING_TO_START
     } else {
@@ -250,15 +258,14 @@ const successfulGuess = () => {
     if (nextTerm) {
         state.currentTerm = nextTerm
     } else {
-        changeRound(state)
+        return changeRound(state)
     }
 
     return saveGame(state)
 }
 const endGame = () => {
     const state = getState()
-
-    state.currentPage = PHASES.DONE
+    state.currentPhase = PHASES.DONE
 
     return saveGame(state)
 }
@@ -266,15 +273,12 @@ const endGame = () => {
 const tick = () => {
     state = getState()
     if (state.timeRemaining > 0) {
-        setTimeout(tick, 1000)
+        state.tick = setTimeout(tick, 1000)
     } else {
         return endTurn()
     }
     changeState(s => {
         s.timeRemaining--
-        if (s.timeRemaining % 10 === 0) {
-            saveGame(s)
-        }
         return s
     })
 }
@@ -379,7 +383,7 @@ const handleBeginGameplay = e => {
 const waitingToStart = state => {
     return html`<p>
         <h1>Round ${state.currentRound + 1}: ${ROUNDS[state.currentRound]}</h1>
-        ${state.currentRound === 0 ? 'Everyone has entered terms.<br />' : ''}
+        ${state.currentRound === 0 ? 'Everyone has entered terms.' : ''}<br />
         <strong>Team 1:</strong><br />
         Players: ${state.teams[0].map(player => player.name).join(', ')}<br />
         Score: ${state.score[0]}<br /><br />
@@ -388,7 +392,7 @@ const waitingToStart = state => {
         Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
         Score: ${state.score[1]}<br /><br />
         
-        <strong>${currentPlayer(state).name}</strong> is up first for <strong>Team ${state.turn + 1}</strong></br />
+        <strong>${currentPlayer(state).name}</strong> is up first for <strong>team ${state.turn + 1}</strong></br />
         ${isCurrentPlayer(state) ? html`<button onclick="${handleBeginGameplay}">Begin round ${state.currentRound + 1}</button>` : ''} 
     </p>` 
 }
@@ -397,6 +401,8 @@ const handleNextTerm = e => {
     e.preventDefault()
 
     return successfulGuess().then(data => {
+        delete data.currentTerm
+        delete data.timeRemaining
         return changeState(data)
     })
 }
@@ -428,7 +434,7 @@ const betweenPlayers = state => {
         Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
         Score: ${state.score[1]}<br /><br />
 
-        <strong>${currentPlayer(state).name}</strong> is up next for <strong>Team ${state.turn + 1}</strong></br />
+        <strong>${currentPlayer(state).name}</strong> is up next for <strong>team ${state.turn + 1}</strong></br />
         ${isCurrentPlayer(state) ? html`<button onclick="${handleResumeGameplay}">Go</button>` : ''} 
     </p>` 
 }
@@ -444,7 +450,7 @@ const gameOver = state => {
     } else {
         headline = "It's a tie!"
     }
-    return html`
+    return html`<div>
         <h1>${headline}</h1>
 
         <strong>Team 1:</strong><br />
@@ -453,8 +459,8 @@ const gameOver = state => {
 
         <strong>Team 2:</strong><br />
         Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
-        Score: ${state.score[1]}<br /><br />
-    `
+        Score: ${state.score[1]}
+    </div>`
 }
 
 const render = state => {
@@ -497,6 +503,9 @@ const init = async () => {
         const data = await fetch(API_BASE + match[1] + '/').then(response => {
             return response.json()
         })
+        if (data.currentPhase === PHASES.PLAY_IN_PROGRESS && isCurrentPlayer(data)) {
+            tick(data)
+        }
         state.change(data)
     }
     catch(err) {
