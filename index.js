@@ -268,7 +268,7 @@ const tick = () => {
     if (state.timeRemaining > 0) {
         setTimeout(tick, 1000)
     } else {
-        endTurn()
+        return endTurn()
     }
     changeState(s => {
         s.timeRemaining--
