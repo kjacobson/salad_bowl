@@ -405,7 +405,7 @@ const handleNextTerm = e => {
     return successfulGuess().then(data => {
         delete data.currentTerm
         delete data.timeRemaining
-        return changeState(data)
+        return changeState(s => Object.assign({}, s, data))
     })
 }
 const playInProgress = state => {
