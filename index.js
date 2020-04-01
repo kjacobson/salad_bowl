@@ -272,12 +272,14 @@ const endGame = () => {
 
 const tick = () => {
     state = getState()
+    let timer
     if (state.timeRemaining > 0) {
-        state.tick = setTimeout(tick, 1000)
+        timer = setTimeout(tick, 1000)
     } else {
         return endTurn()
     }
     changeState(s => {
+        s.tick = timer
         s.timeRemaining--
         return s
     })
