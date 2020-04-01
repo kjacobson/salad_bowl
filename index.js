@@ -218,6 +218,7 @@ const endTurn = () => {
     const player = state.teams[state.turn].pop()
     state.teams[state.turn].push(player)
     state.turn = state.turn ? 0 : 1
+    state.timeRemaining = TIME_PER_ROUND
     state.currentPhase = PHASES.BETWEEN_PLAYERS
 
     return saveGame(state)
@@ -234,7 +235,7 @@ const changeRound = (state) => {
 
     if (state.currentRound < 2) {
         state.currentRound++
-        state.timeRemaining = 60
+        state.timeRemaining = TIME_PER_ROUND
         state.currentPhase = PHASES.WAITING_TO_START
     } else {
         return endGame()
@@ -251,6 +252,13 @@ const successfulGuess = () => {
     } else {
         changeRound(state)
     }
+
+    return saveGame(state)
+}
+const endGame = () => {
+    const state = getState()
+
+    state.currentPage = PHASES.DONE
 
     return saveGame(state)
 }
@@ -424,6 +432,31 @@ const betweenPlayers = state => {
         ${isCurrentPlayer(state) ? html`<button onclick="${handleResumeGameplay}">Go</button>` : ''} 
     </p>` 
 }
+
+const gameOver = state => {
+    const [team1, team2] = state.score
+    let headline
+    if (team1 > team2) {
+        headline = "Team 1 wins!"
+    } else
+    if (team2 > team1) {
+        headline = "Team 2 wins!"
+    } else {
+        headline = "It's a tie!"
+    }
+    return html`
+        <h1>${headline}</h1>
+
+        <strong>Team 1:</strong><br />
+        Players: ${state.teams[0].map(player => player.name).join(', ')}<br />
+        Score: ${state.score[0]}<br /><br />
+
+        <strong>Team 2:</strong><br />
+        Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
+        Score: ${state.score[1]}<br /><br />
+    `
+}
+
 const render = state => {
     const el = html`<main id="main">${body(state)}</main>`
     document.body.replaceChild(el, document.getElementById('main'))
@@ -444,7 +477,7 @@ const body = state => {
         case PHASES.BETWEEN_PLAYERS:
             return betweenPlayers(state)
         case PHASES.DONE:
-            return ''
+            return gameOver(state)
     }
 }
 const URL_REGEX = /(\/games\/[a-f0-9]{8}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{4}\-[a-f0-9]{12})/
