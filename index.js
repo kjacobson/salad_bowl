@@ -356,6 +356,7 @@ const handleEnterTerm = e => {
 }
 const enterTerm = state => {
     return html`
+        <h1>Enter ${TERMS_PER_PLAYER} terms</h1>
         <form onsubmit=${handleEnterTerm}>
             <input type="text" required id="term" placeholder="person, place, thing" />
             <button>Add term</button>
@@ -364,14 +365,15 @@ const enterTerm = state => {
 }
 
 const collectingTerms = state => {
-    const terms = html`<ul>${getPlayerTerms().map(term => html`<li>${term}</li>`)}</ul>`
+    const playerTerms = getPlayerTerms()
+    const terms = playerTerms.length ? html`<ul>${playerTerms.map(term => html`<li>${term}</li>`)}</ul>` : '...'
 
     return html`
-        <h2>Your terms</h2><ul>${terms}</ul>
         ${hasAddedTerms(state.players)
             ? html`<p>Waiting on other players to finishing adding terms.</p>`
             : enterTerm(state)
         }
+        <h2>Your terms:</h2>${terms || '...'}
     `
 }
 
@@ -468,6 +470,11 @@ const gameOver = state => {
 const render = state => {
     const el = html`<main id="main">${body(state)}</main>`
     document.body.replaceChild(el, document.getElementById('main'))
+
+    const inputs = document.querySelectorAll('input[type="text"]')
+    if (inputs.length) {
+        inputs.forEach(input => input.focus())
+    }
 }
 
 const body = state => {
