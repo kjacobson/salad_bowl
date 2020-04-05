@@ -113,12 +113,19 @@ const divideTeams = players => {
     }
     return [team1, team2]
 }
+
 const shuffle = array => {
-    let terms = Array.from(array), i, j
-    for (i = terms.length - 1; i > 0; i--) {
-        j = Math.floor(Math.random() * (i + 1))
-        [terms[i], terms[j]] = [terms[j], terms[i]]
+    let terms = Array.from(array)
+    let m = terms.length, t, i
+
+    while (m) {
+        i = Math.floor(Math.random() * m--)
+
+        t = terms[m]
+        terms[m] = terms[i]
+        terms[i] = t
     }
+
     return terms
 }
 
@@ -208,7 +215,7 @@ const beginGameplay = () => {
     const state = getState()
     state.currentPhase = PHASES.PLAY_IN_PROGRESS
     state.activeTerms = shuffle(state.terms)
-    state.currentTerm = state.activeTerms.pop()
+    state.currentTerm = state.activeTerms.shift()
     tick(state)
 
     return saveGame(state)
@@ -229,7 +236,7 @@ const endTurn = () => {
 const resumeGameplay = () => {
     const state = getState()
     state.currentPhase = PHASES.PLAY_IN_PROGRESS
-    state.currentTerm = state.activeTerms.pop()
+    state.currentTerm = state.activeTerms.shift()
     tick(state)
 
     return saveGame(state)
@@ -245,6 +252,7 @@ const changeRound = (state) => {
         state.turn = state.turn ? 0 : 1
         state.timeRemaining = TIME_PER_ROUND
         state.currentPhase = PHASES.WAITING_TO_START
+        state.currentTerm = null
     } else {
         return endGame()
     }
@@ -254,7 +262,7 @@ const successfulGuess = () => {
     const state = getState()
 
     state.score[state.turn]++
-    const nextTerm = state.activeTerms.pop()
+    const nextTerm = state.activeTerms.shift()
     if (nextTerm) {
         state.currentTerm = nextTerm
     } else {

@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "browserify index.js -o index.prod.js -d",
+    "build": "browserify -t nanohtml index.js -o index.prod.js -d",
     "start:combined": "npm run start:node && npm run state:redis",
     "start:node": "node ./server.js",
     "start:redis": "node ./redis-server.js"
