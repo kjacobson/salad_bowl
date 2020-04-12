@@ -309,7 +309,7 @@ const handleNewGame = e => {
     })
 }
 const newGame = state => {
-    return  html`<form onsubmit="${handleNewGame}">
+    return  html`<h1>Start a new game</h1><form onsubmit="${handleNewGame}">
         <input id="playerName" type="text" placeholder="your name" required />
         <button type="submit">New game</button>
     </form>`
@@ -341,16 +341,23 @@ const handleStartGame = e => {
 }
 const logIn = state => {
     return hasSignedIn(state.players)
-        ? html`<p>Waiting on other players. <br />
-            <a href="?/games/${state.id}">?/games/${state.id}</a><br />
-            ${isAdmin(state.adminId) ? html`<button onclick="${handleStartGame}">Start game</button>` : ''}
+        ? html`<h1>Waiting on other players. </h1>
+            <h2>Share this link to let them join:</h2>
+            <a href="?/games/${state.id}">?/games/${state.id}</a>
+            <br />
+            <br />
+            ${isAdmin(state.adminId) ? html`When you're ready, click this button:<br /><button onclick="${handleStartGame}">Start game</button>` : ''}
         </p><ul>
             ${state.players.map((player) => {
                 return html`<li>${player.name}</li>`
             })}
         </ul>`
-        : html`<form onsubmit=${handleAddPlayer}> <input id="playerName" type="text" placeholder="your name" required />
-            <button type="submit">Sign in</button></form>`
+        : html`<h1>You've been invited to join a game of celebrity</h1>
+            <h2>Add your name to start</h2>
+            <form onsubmit=${handleAddPlayer}>
+                <input id="playerName" type="text" placeholder="your name" required />
+                <button type="submit">Sign in</button>
+            </form>`
 }
 
 
