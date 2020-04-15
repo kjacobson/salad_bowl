@@ -3,8 +3,6 @@ const uuid = require('uuid').v4
 const ioClient = require('socket.io-client')
 
 const API_BASE = ''
-const TERMS_PER_PLAYER = 3
-const TIME_PER_ROUND = 60
 const ROUNDS = [
     'Describe the term in as many words as necessary',
     'Act out the term, but don\'t speak',
@@ -54,7 +52,6 @@ const initialState = () => {
         turn: 0,
         currentTerm: null,
         score: [0, 0],
-        timeRemaining: TIME_PER_ROUND,
         currentPhase: PHASES.NO_ACTIVE_GAMES
     }
 }
@@ -77,16 +74,16 @@ const currentPlayer = state => {
 const isCurrentPlayer = state => { 
     return currentPlayer(state).id === playerId()
 }
-const hasAddedTerms = players => {
-    const player = hasSignedIn(players)
+const hasAddedTerms = state => {
+    const player = hasSignedIn(state.players)
 
     if (player) {
-        return getPlayerTerms().length === TERMS_PER_PLAYER
+        return getPlayerTerms().length === state.termsPerPlayer
     }
     return false
 }
 const allPlayersDoneAddingWords = state => {
-    return state.terms.length === state.players.length * TERMS_PER_PLAYER
+    return state.terms.length === state.players.length * state.termsPerPlayer
 }
 
 const initLocalPlayer = id => {
@@ -151,7 +148,7 @@ const saveGame = state => {
     })
 }
 
-const createGame = adminName => {
+const createGame = (adminName, termsPerPlayer, timePerTurn) => {
     const state = getState()
     state.id = uuid()
     state.adminId = uuid() 
@@ -159,6 +156,9 @@ const createGame = adminName => {
         id: state.adminId,
         name: adminName
     })
+    state.timePerTurn = parseInt(timePerTurn)
+    state.timeRemaining = parseInt(timePerTurn)
+    state.termsPerPlayer = parseInt(termsPerPlayer)
     state.currentPhase = PHASES.PLAYER_SIGN_IN
     return new Promise((resolve, reject) => {
         return fetch(API_BASE + '/games', {
@@ -228,7 +228,7 @@ const endTurn = () => {
     // move the player who just played to the end of the line
     state.teams[state.turn].push(state.teams[state.turn].shift())
     state.turn = state.turn ? 0 : 1
-    state.timeRemaining = TIME_PER_ROUND
+    state.timeRemaining = state.timePerTurn
     state.currentPhase = PHASES.BETWEEN_PLAYERS
 
     return saveGame(state)
@@ -250,7 +250,7 @@ const changeRound = (state) => {
         state.teams[state.turn].push(state.teams[state.turn].shift())
         state.currentRound++
         state.turn = state.turn ? 0 : 1
-        state.timeRemaining = TIME_PER_ROUND
+        state.timeRemaining = state.timePerTurn
         state.currentPhase = PHASES.WAITING_TO_START
         state.currentTerm = null
     } else {
@@ -296,21 +296,32 @@ const tick = () => {
 
 const handleNewGame = e => {
     e.preventDefault()
-    const input = document.getElementById('playerName')
-    const name = input.value
+    const name = document.getElementById('playerName').value
+    const terms = document.getElementById('termsPerPlayer').value
+    const time = document.getElementById('timePerTurn').value
     
-    return createGame(name).then(data => {
+    return createGame(name, terms, time).then(data => {
         initLocalPlayer(data.adminId)
-        return changeState(s => {
-            return Object.assign({}, s, data)
-        })
+        window.location = window.location.href + '?/games/' + data.id
     }, err => {
         console.error(err)
     })
 }
 const newGame = state => {
     return  html`<h1>Start a new game</h1><form onsubmit="${handleNewGame}">
-        <input id="playerName" type="text" placeholder="your name" required />
+        <label for="playerName">Your name:</label><br />
+        <input id="playerName" type="text" placeholder="your name" required /><br /><br />
+
+        <label for="termsPerPlayer">Terms per player:</label><br />
+        <input id="termsPerPlayer" type="number" size="2" value="3" required /><br /><br />
+
+        <label for="timePerTurn">Length of turn:</label><br />
+        <select id="timePerTurn">
+            <option value="15">15 seconds</option>
+            <option value="30">30 seconds</option>
+            <option value="45">45 seconds</option>
+            <option value="60" selected>60 seconds</option>
+        </select><br /><br />
         <button type="submit">New game</button>
     </form>`
 }
@@ -343,7 +354,7 @@ const logIn = state => {
     return hasSignedIn(state.players)
         ? html`<h1>Waiting on other players. </h1>
             <h2>Share this link to let them join:</h2>
-            <a href="?/games/${state.id}">?/games/${state.id}</a>
+            <a href="?/games/${state.id}">${window.location.href}</a>
             <br />
             <br />
             ${isAdmin(state.adminId) ? html`When you're ready, click this button:<br /><button onclick="${handleStartGame}">Start game</button>` : ''}
@@ -371,7 +382,7 @@ const handleEnterTerm = e => {
 }
 const enterTerm = state => {
     return html`
-        <h1>Enter ${TERMS_PER_PLAYER} terms</h1>
+        <h1>Enter ${state.termsPerPlayer} terms</h1>
         <form onsubmit=${handleEnterTerm}>
             <input type="text" required id="term" placeholder="person, place, thing" />
             <button>Add term</button>
@@ -384,7 +395,7 @@ const collectingTerms = state => {
     const terms = playerTerms.length ? html`<ul>${playerTerms.map(term => html`<li>${term}</li>`)}</ul>` : '...'
 
     return html`
-        ${hasAddedTerms(state.players)
+        ${hasAddedTerms(state)
             ? html`<p>Waiting on other players to finishing adding terms.</p>`
             : enterTerm(state)
         }
