@@ -26,15 +26,16 @@ class AppState {
         return this
     }
 
-    change(modifier) {
+    change(modifier, render = true) {
         if (typeof modifier === "function") {
             this.state = modifier(this.get())
         } else
         if (modifier) {
             this.state = modifier
         }
-
-        this.renderFn(this.get())
+        if (render) {
+            this.renderFn(this.get())
+        }
     }
 
     get() {
@@ -52,7 +53,8 @@ const initialState = () => {
         turn: 0,
         currentTerm: null,
         score: [0, 0],
-        currentPhase: PHASES.NO_ACTIVE_GAMES
+        currentPhase: PHASES.NO_ACTIVE_GAMES,
+        playerTerms: {}
     }
 }
 
@@ -74,29 +76,36 @@ const currentPlayer = state => {
 const isCurrentPlayer = state => { 
     return currentPlayer(state).id === playerId()
 }
-const hasAddedTerms = state => {
+const getPlayerTerms = state => {
     const player = hasSignedIn(state.players)
 
-    if (player) {
-        return getPlayerTerms().length === state.termsPerPlayer
-    }
-    return false
+    return state.playerTerms[player.id]
 }
-const allPlayersDoneAddingWords = state => {
-    return state.terms.length === state.players.length * state.termsPerPlayer
+const hasAddedTerms = state => {
+    return getPlayerTerms(state).length === state.termsPerPlayer
+}
+const allPlayersDoneAddingTerms =  state => {
+    for (let k in state.playerTerms) {
+        if (state.playerTerms[k].length < state.termsPerPlayer) {
+            return false
+        }
+    }
+    return true
 }
 
 const initLocalPlayer = id => {
     localStorage.setItem('playerId', id)
-    localStorage.setItem('terms', JSON.stringify([]))
 }
-const getPlayerTerms = () => {
-    return JSON.parse(localStorage.getItem('terms')) || []
+const addPlayerTerm = (state, term) => {
+    const player = hasSignedIn(state.players)
+    state.playerTerms[player.id].push(term)
 }
-const addPlayerTerm = term => {
-    const terms = getPlayerTerms()
-    terms.push(term)
-    localStorage.setItem('terms', JSON.stringify(terms))
+const collectTerms = (playerTerms) => {
+    let terms = []
+    for (let k in playerTerms) {
+        terms = terms.concat(playerTerms[k])
+    }
+    return terms
 }
 
 
@@ -156,6 +165,7 @@ const createGame = (adminName, termsPerPlayer, timePerTurn) => {
         id: state.adminId,
         name: adminName
     })
+    state.playerTerms[state.adminId] = []
     state.timePerTurn = parseInt(timePerTurn)
     state.timeRemaining = parseInt(timePerTurn)
     state.termsPerPlayer = parseInt(termsPerPlayer)
@@ -183,6 +193,7 @@ const createGame = (adminName, termsPerPlayer, timePerTurn) => {
 const addPlayer = (name, playerId) => {
     const state = getState() 
     state.players.push({id: playerId, name: name})
+    state.playerTerms[playerId] = []
 
     return saveGame(state)
 }
@@ -195,12 +206,18 @@ const startGame = () => {
 const addTerm = term => {
     const state = getState()
     const player = hasSignedIn(state.players)
-    state.terms.push(term)
+    addPlayerTerm(state, term)
 
-    if (allPlayersDoneAddingWords(state)) {
+    if (allPlayersDoneAddingTerms(state)) {
+        state.terms = collectTerms(state.playerTerms)
         return prepareToStart(state)
+    } else
+    if (hasAddedTerms(state)) {
+        return saveGame(state)
+    } else {
+        changeState(state)
+        return Promise.resolve(state)
     }
-    return saveGame(state)
 }
 const prepareToStart = state => {
     state = state || getState()
@@ -289,8 +306,12 @@ const tick = () => {
     changeState(s => {
         s.tick = timer
         s.timeRemaining--
+        const el = document.getElementById('timer')
+        if (el) {
+            el.innerHTML = ':' + s.timeRemaining
+        }
         return s
-    })
+    }, false)
 }
 
 
@@ -372,32 +393,42 @@ const logIn = state => {
 }
 
 
-const handleEnterTerm = e => {
-    e.preventDefault()
-    const term = document.getElementById('term').value
-    return addTerm(term).then(data => {
-        addPlayerTerm(term)
-        return changeState(data)
-    })
+const enterTerm = () => {
+    let contents = ''
+
+    const handleKeyUp = e => {
+        contents = e.target.value
+    }
+
+    const handleEnterTerm = e => {
+        e.preventDefault()
+        const term = document.getElementById('term').value
+        contents = ''
+        return addTerm(term).then(data => {
+            return changeState(data)
+        })
+    }
+
+    return (state) => {
+        return html`
+            <h1>Enter ${state.termsPerPlayer} terms</h1>
+            <form onsubmit=${handleEnterTerm}>
+                <input type="text" required id="term" placeholder="person, place, thing" value="${contents}" onkeyup="${handleKeyUp}" />
+                <button>Add term</button>
+            </form>
+        `
+    }
 }
-const enterTerm = state => {
-    return html`
-        <h1>Enter ${state.termsPerPlayer} terms</h1>
-        <form onsubmit=${handleEnterTerm}>
-            <input type="text" required id="term" placeholder="person, place, thing" />
-            <button>Add term</button>
-        </form>
-    `
-}
+const enterTermPage = enterTerm()
 
 const collectingTerms = state => {
-    const playerTerms = getPlayerTerms()
+    const playerTerms = getPlayerTerms(state)
     const terms = playerTerms.length ? html`<ul>${playerTerms.map(term => html`<li>${term}</li>`)}</ul>` : '...'
 
     return html`
         ${hasAddedTerms(state)
             ? html`<p>Waiting on other players to finishing adding terms.</p>`
-            : enterTerm(state)
+            : enterTermPage(state)
         }
         <h2>Your terms:</h2>${terms || '...'}
     `
@@ -433,12 +464,17 @@ const handleNextTerm = e => {
     return successfulGuess().then(data => {
         delete data.currentTerm
         delete data.timeRemaining
+        delete data.activeTerms
         return changeState(s => Object.assign({}, s, data))
     })
 }
 const playInProgress = state => {
     return isCurrentPlayer(state)
-        ? html`<h1>${state.currentTerm} <button onclick="${handleNextTerm}">Next term</button></h1><span>${state.timeRemaining}</span>`
+        ? html`
+            <h1>${state.currentTerm}</h1>
+            <span id="timer">:${state.timeRemaining}</span><br />
+            ${html`<button onclick=${handleNextTerm}>Next term</button>`}
+        `
         : html`
             <h1>Round ${state.currentRound + 1}: ${ROUNDS[state.currentRound]}</h1>
             <h2>Current player: ${currentPlayer(state).name}</h2>
@@ -492,6 +528,17 @@ const gameOver = state => {
         Score: ${state.score[1]}
     </div>`
 }
+const moveCursorToEnd = (el) => {
+    if (typeof el.selectionStart === "number") {
+        el.selectionStart = el.selectionEnd = el.value.length
+    } else if (typeof el.createTextRange !== "undefined") {
+        el.focus()
+        const range = el.createTextRange()
+        range.collapse(false)
+        range.select()
+    }
+    el.focus()
+}
 
 const render = state => {
     const el = html`<main id="main">${body(state)}</main>`
@@ -499,7 +546,7 @@ const render = state => {
 
     const inputs = document.querySelectorAll('input[type="text"]')
     if (inputs.length) {
-        inputs.forEach(input => input.focus())
+        Array.from(inputs).map(moveCursorToEnd)
     }
 }
 
@@ -531,7 +578,14 @@ const init = async () => {
 
     const io = ioClient()
     io.on('update', data => {
-        state.change(data)
+        if (data.id === getState().id) {
+            const player = hasSignedIn(data.players)
+            // don't let current player lose a race when adding terms
+            if (player) {
+                data.playerTerms[player.id] = state.get().playerTerms[player.id]
+            }
+            state.change(data)
+        }
     })
     try {
         const match = window.location.href.match(URL_REGEX)
