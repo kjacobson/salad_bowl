@@ -413,7 +413,7 @@ const enterTerm = () => {
         return html`
             <h1>Enter ${state.termsPerPlayer} terms</h1>
             <form onsubmit=${handleEnterTerm}>
-                <input type="text" required id="term" placeholder="person, place, thing" value="${contents}" onkeyup="${handleKeyUp}" />
+                <input type="text" required id="term" size="48" placeholder="Enter a person, place OR thing (one at a time!)" value="${contents}" onkeyup="${handleKeyUp}" />
                 <button>Add term</button>
             </form>
         `
