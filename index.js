@@ -264,10 +264,7 @@ const changeRound = (state) => {
 
     if (state.currentRound < 2) {
         // move the player who just played to the end of the line
-        state.teams[state.turn].push(state.teams[state.turn].shift())
         state.currentRound++
-        state.turn = state.turn ? 0 : 1
-        state.timeRemaining = state.timePerTurn
         state.currentPhase = PHASES.WAITING_TO_START
         state.currentTerm = null
     } else {
@@ -453,7 +450,11 @@ const waitingToStart = state => {
         Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
         Score: ${state.score[1]}<br /><br />
         
-        <strong>${currentPlayer(state).name}</strong> is up first for <strong>team ${state.turn + 1}</strong></br />
+        ${state.timeRemaining < state.timePerTurn
+            ? `<strong>${currentPlayer(state).name}</strong> is up first for <strong>team ${state.turn + 1}</strong></br />`
+            : `<strong>${currentPlayer(state).name}</strong> continues their turn with ${state.timeRemaining} seconds remaining<br />`
+        }
+        
         ${isCurrentPlayer(state) ? html`<button onclick="${handleBeginGameplay}">Begin round ${state.currentRound + 1}</button>` : ''} 
     </p>` 
 }
@@ -499,7 +500,7 @@ const betweenPlayers = state => {
         <strong>Team 2:</strong><br />
         Players: ${state.teams[1].map(player => player.name).join(', ')}<br />
         Score: ${state.score[1]}<br /><br />
-
+        
         <strong>${currentPlayer(state).name}</strong> is up next for <strong>team ${state.turn + 1}</strong></br />
         ${isCurrentPlayer(state) ? html`<button onclick="${handleResumeGameplay}">Go</button>` : ''} 
     </p>` 
