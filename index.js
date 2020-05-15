@@ -451,8 +451,8 @@ const waitingToStart = state => {
         Score: ${state.score[1]}<br /><br />
         
         ${state.timeRemaining < state.timePerTurn
-            ? `<strong>${currentPlayer(state).name}</strong> is up first for <strong>team ${state.turn + 1}</strong></br />`
-            : `<strong>${currentPlayer(state).name}</strong> continues their turn with ${state.timeRemaining} seconds remaining<br />`
+            ? html`<strong>${currentPlayer(state).name}</strong> continues their turn with ${state.timeRemaining} seconds remaining<br />`
+            : html`<strong>${currentPlayer(state).name}</strong> is up first for <strong>team ${state.turn + 1}</strong></br />`
         }
         
         ${isCurrentPlayer(state) ? html`<button onclick="${handleBeginGameplay}">Begin round ${state.currentRound + 1}</button>` : ''} 
